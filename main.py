@@ -44,6 +44,7 @@ def parse_args():
     parser.add_argument('-a', '--all', type=int, metavar='V', help='Executar todas as operações a partir do vértice V (1 a n)')
     parser.add_argument('-p', '--print', action='store_true', dest='print_rep', help='Imprimir a representação do grafo')
     parser.add_argument('--directed', action='store_true', help='Forçar interpretação como grafo direcionado')
+    parser.add_argument('--measure', action='store_true', help='Medir memória usada ao construir o grafo (list vs matrix)')
     parser.add_argument('pos_input', nargs='?', help='(posicional) arquivo de entrada')
     parser.add_argument('pos_output', nargs='?', help='(posicional) arquivo de saída')
     args = parser.parse_args()
@@ -165,14 +166,83 @@ def main():
         return 0
 
     # Modo de arquivo
-    try:
-        g = Grafo.from_file(args.input, representacao=args.rep)
-        # Sobrescrever se usuário especificou --directed
-        if args.directed:
-            g.direcionado = True
-    except Exception as e:
-        print(f"Erro ao ler '{args.input}': {e}")
-        return 1
+    # If measurement requested, perform two separate constructions and report memory
+    if args.measure:
+        import tracemalloc, time
+        try:
+            import psutil
+            psutil_available = True
+            proc = psutil.Process()
+        except Exception:
+            psutil_available = False
+
+        def measure_build(repr_name: str):
+            print(f"\nMedindo construção com representação: {repr_name}")
+            tracemalloc.start()
+            t0 = time.time()
+            rss_before = proc.memory_info().rss if psutil_available else None
+            try:
+                g_local = Grafo.from_file(args.input, representacao=repr_name)
+                if args.directed:
+                    g_local.direcionado = True
+            except MemoryError:
+                tracemalloc.stop()
+                print("Construção falhou por falta de memória (MemoryError)")
+                return None
+            except Exception as e:
+                tracemalloc.stop()
+                print(f"Erro durante construção: {e}")
+                return None
+            t1 = time.time()
+            current, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            rss_after = proc.memory_info().rss if psutil_available else None
+            result = {
+                'repr': repr_name,
+                'time_s': t1 - t0,
+                'tracemalloc_current_mb': current / 1024 / 1024,
+                'tracemalloc_peak_mb': peak / 1024 / 1024,
+                'rss_before_mb': (rss_before / 1024 / 1024) if rss_before is not None else None,
+                'rss_after_mb': (rss_after / 1024 / 1024) if rss_after is not None else None,
+                'graph': g_local,
+            }
+            return result
+
+        # measure list
+        res_list = measure_build('list')
+        # measure matrix
+        res_matrix = measure_build('matrix')
+
+        print("\nResultado da medição:")
+        for res in (res_list, res_matrix):
+            if res is None:
+                print("  - Falha ao medir representação (possível falta de memória)")
+                continue
+            print(f"  Representação: {res['repr']}")
+            print(f"    Tempo de construção: {res['time_s']:.2f} s")
+            print(f"    tracemalloc pico: {res['tracemalloc_peak_mb']:.2f} MB")
+            if psutil_available:
+                print(f"    RSS antes: {res['rss_before_mb']:.2f} MB, depois: {res['rss_after_mb']:.2f} MB")
+            print("")
+
+        # If list build succeeded, continue using that graph instance for further ops
+        if res_list and res_list.get('graph'):
+            g = res_list['graph']
+        elif res_matrix and res_matrix.get('graph'):
+            g = res_matrix['graph']
+        else:
+            print("Nenhum grafo válido foi construído; abortando.")
+            return 1
+
+    else:
+        try:
+            g = Grafo.from_file(args.input, representacao=args.rep)
+            # Sobrescrever se usuário especificou --directed
+            if args.directed:
+                g.direcionado = True
+        except Exception as e:
+            print(f"Erro ao ler '{args.input}': {e}")
+            return 1
 
     # Informar tipo do grafo
     tipo_grafo = "direcionado" if g.direcionado else "não direcionado"
@@ -190,14 +260,11 @@ def main():
         print(f"Erro ao escrever '{args.output}': {e}")
         return 1
 
-    # Relatório curto no console
+    # Relatório curto no console (resumo apenas)
     print(f"\n# n = {g.n}")
     print(f"# m = {g.num_arestas()}")
-    print("\nGrau dos vértices:")
-    for i in range(1, g.n + 1):
-        print(f"{i}: {g.grau(i)}")
-
-    print(f"\nResumo escrito em '{args.output}'")
+    # Os graus completos são gravados em arquivo pelo método write_summary()
+    print(f"\nGrau dos vértices gravados em '{args.output}'")
 
     # Executar operações de busca/componentes se solicitado
     if args.all is not None:
