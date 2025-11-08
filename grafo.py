@@ -1,3 +1,6 @@
+from collections import deque
+
+
 class Grafo:
     """Representação de grafo que mantém simultaneamente lista de adjacência
     e matriz de adjacência. Os vértices no arquivo de entrada são esperados
@@ -10,10 +13,14 @@ class Grafo:
     - num_arestas()
     - from_file(path) -> Grafo (classmethod)
     - write_summary(path, rep='list'|'matrix'|'both')
+    - bfs(inicio, arquivo_saida) - Busca em largura
+    - dfs(inicio, arquivo_saida) - Busca em profundidade
+    - componentes_conexos(arquivo_saida) - Encontra componentes conexos
     """
 
-    def __init__(self, n: int):
+    def __init__(self, n: int, direcionado: bool = False):
         self.n = int(n)
+        self.direcionado = direcionado
         # lista de adjacência: cada entrada armazena vértices em base 1
         self.lista_adj = [[] for _ in range(self.n)]
         # matriz de adjacência (0/1)
@@ -32,12 +39,13 @@ class Grafo:
         # lista armazena vértices em base 1 (para facilitar leitura/escrita)
         if v not in self.lista_adj[u - 1]:
             self.lista_adj[u - 1].append(v)
-        if u not in self.lista_adj[v - 1]:
+        if not self.direcionado and u not in self.lista_adj[v - 1]:
             self.lista_adj[v - 1].append(u)
 
         # matriz é 0/1
         self.matriz_adj[u - 1][v - 1] = 1
-        self.matriz_adj[v - 1][u - 1] = 1
+        if not self.direcionado:
+            self.matriz_adj[v - 1][u - 1] = 1
 
     def grau(self, v: int, rep: str = 'list') -> int:
         """Retorna o grau do vértice v (1-based).
@@ -58,7 +66,152 @@ class Grafo:
         """Retorna número de arestas (grafo não direcionado)."""
         # soma dos graus / 2
         total_grau = sum(len(adj) for adj in self.lista_adj)
-        return total_grau // 2
+        return total_grau // 2 if not self.direcionado else total_grau
+
+    def bfs(self, inicio: int, arquivo_saida: str = "bfs_resultado.txt"):
+        """Executa busca em largura (BFS) a partir do vértice inicial (1-based).
+
+        Args:
+            inicio: vértice inicial (1-based)
+            arquivo_saida: nome do arquivo para salvar os resultados
+
+        Returns:
+            tuple: (pai, nivel) - vetores com o pai e nível de cada vértice (1-based)
+        """
+        if inicio < 1 or inicio > self.n:
+            raise ValueError(f"Vértice inicial fora do intervalo: {inicio}")
+
+        # Trabalha internamente com índices 0-based
+        inicio_idx = inicio - 1
+
+        visitado = [False] * self.n
+        nivel = [-1] * self.n
+        pai = [-1] * self.n
+
+        fila = deque([inicio_idx])
+        visitado[inicio_idx] = True
+        nivel[inicio_idx] = 0
+
+        while fila:
+            u_idx = fila.popleft()
+            # lista_adj armazena vértices em base 1
+            for v in self.lista_adj[u_idx]:
+                v_idx = v - 1
+                if not visitado[v_idx]:
+                    visitado[v_idx] = True
+                    pai[v_idx] = u_idx + 1  # armazena pai em base 1
+                    nivel[v_idx] = nivel[u_idx] + 1
+                    fila.append(v_idx)
+
+        # Salvar resultados em arquivo
+        self._salvar_resultado(pai, nivel, "BFS", arquivo_saida)
+
+        return pai, nivel
+
+    def dfs(self, inicio: int, arquivo_saida: str = "dfs_resultado.txt"):
+        """Executa busca em profundidade (DFS) a partir do vértice inicial (1-based).
+
+        Args:
+            inicio: vértice inicial (1-based)
+            arquivo_saida: nome do arquivo para salvar os resultados
+
+        Returns:
+            tuple: (pai, nivel) - vetores com o pai e nível de cada vértice (1-based)
+        """
+        if inicio < 1 or inicio > self.n:
+            raise ValueError(f"Vértice inicial fora do intervalo: {inicio}")
+
+        inicio_idx = inicio - 1
+
+        visitado = [False] * self.n
+        nivel = [-1] * self.n
+        pai = [-1] * self.n
+
+        nivel[inicio_idx] = 0
+        self._dfs_recursivo(inicio_idx, visitado, nivel, pai)
+
+        # Salvar resultados em arquivo
+        self._salvar_resultado(pai, nivel, "DFS", arquivo_saida)
+
+        return pai, nivel
+
+    def _dfs_recursivo(self, u_idx: int, visitado: list, nivel: list, pai: list):
+        """Função auxiliar recursiva para DFS (trabalha com índices 0-based)"""
+        visitado[u_idx] = True
+
+        # lista_adj armazena vértices em base 1
+        for v in self.lista_adj[u_idx]:
+            v_idx = v - 1
+            if not visitado[v_idx]:
+                pai[v_idx] = u_idx + 1  # armazena pai em base 1
+                nivel[v_idx] = nivel[u_idx] + 1
+                self._dfs_recursivo(v_idx, visitado, nivel, pai)
+
+    def componentes_conexos(self, arquivo_saida: str = "componentes_resultado.txt"):
+        """Encontra os componentes conexos do grafo.
+
+        Args:
+            arquivo_saida: nome do arquivo para salvar os resultados
+
+        Returns:
+            list: lista de componentes, onde cada componente é uma lista de vértices (1-based)
+        """
+        visitado = [False] * self.n
+        componentes = []
+
+        for v_idx in range(self.n):
+            if not visitado[v_idx]:
+                componente = []
+                self._dfs_componente(v_idx, visitado, componente)
+                # Converte para base 1 e ordena
+                componente_base1 = sorted([v + 1 for v in componente])
+                componentes.append(componente_base1)
+
+        # Salvar resultados em arquivo
+        self._salvar_componentes(componentes, arquivo_saida)
+
+        return componentes
+
+    def _dfs_componente(self, u_idx: int, visitado: list, componente: list):
+        """Função auxiliar DFS para encontrar componentes conexos (trabalha com índices 0-based)"""
+        visitado[u_idx] = True
+        componente.append(u_idx)
+
+        # lista_adj armazena vértices em base 1
+        for v in self.lista_adj[u_idx]:
+            v_idx = v - 1
+            if not visitado[v_idx]:
+                self._dfs_componente(v_idx, visitado, componente)
+
+    def _salvar_componentes(self, componentes: list, arquivo_saida: str):
+        """Salva os componentes conexos em arquivo."""
+        with open(arquivo_saida, 'w', encoding='utf-8') as f:
+            f.write("COMPONENTES CONEXOS\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(f"Número de componentes: {len(componentes)}\n\n")
+
+            for i, comp in enumerate(componentes, 1):
+                f.write(f"Componente {i}:\n")
+                f.write(f"  Tamanho: {len(comp)} vértices\n")
+                f.write(f"  Vértices: {comp}\n\n")
+
+        print(f"Resultados salvos em '{arquivo_saida}'")
+
+    def _salvar_resultado(self, pai: list, nivel: list, tipo_busca: str, arquivo_saida: str):
+        """Salva os resultados da busca em arquivo."""
+        with open(arquivo_saida, 'w', encoding='utf-8') as f:
+            f.write(f"Resultado da busca {tipo_busca}\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(f"{'Vértice':<10} {'Pai':<10} {'Nível':<10}\n")
+            f.write("-" * 50 + "\n")
+
+            for v_idx in range(self.n):
+                v = v_idx + 1  # converte para base 1
+                pai_str = str(pai[v_idx]) if pai[v_idx] != -1 else "raiz"
+                nivel_str = str(nivel[v_idx]) if nivel[v_idx] != -1 else "não visitado"
+                f.write(f"{v:<10} {pai_str:<10} {nivel_str:<10}\n")
+
+        print(f"Resultados salvos em '{arquivo_saida}'")
 
     @classmethod
     def from_file(cls, path: str) -> 'Grafo':

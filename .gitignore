@@ -85,3 +85,6 @@ $RECYCLE.BIN/
 
 # Editor backup files
 *~
+
+#arquivo de saida
+saida.txt
