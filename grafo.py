@@ -18,13 +18,16 @@ class Grafo:
     - componentes_conexos(arquivo_saida) - Encontra componentes conexos
     """
 
-    def __init__(self, n: int, direcionado: bool = False):
+    def __init__(self, n: int, direcionado: bool = False, default_rep: str = 'list'):
         self.n = int(n)
-        self.direcionado = direcionado
+        self.direcionado = bool(direcionado)
         # lista de adjacência: cada entrada armazena vértices em base 1
         self.lista_adj = [[] for _ in range(self.n)]
         # matriz de adjacência (0/1)
         self.matriz_adj = [[0] * self.n for _ in range(self.n)]
+        if default_rep not in ('list', 'matrix'):
+            raise ValueError("default_rep deve ser 'list' ou 'matrix'")
+        self.default_rep = default_rep
 
     def adicionar_aresta(self, u: int, v: int) -> None:
         """Adiciona aresta não direcionada entre u e v. u/v são 1-based.
@@ -39,12 +42,13 @@ class Grafo:
         # lista armazena vértices em base 1 (para facilitar leitura/escrita)
         if v not in self.lista_adj[u - 1]:
             self.lista_adj[u - 1].append(v)
-        if not self.direcionado and u not in self.lista_adj[v - 1]:
-            self.lista_adj[v - 1].append(u)
-
-        # matriz é 0/1
+        # matriz é 0/1 para aresta u->v
         self.matriz_adj[u - 1][v - 1] = 1
+
         if not self.direcionado:
+            # se não direcionado, adicionar também v->u
+            if u not in self.lista_adj[v - 1]:
+                self.lista_adj[v - 1].append(u)
             self.matriz_adj[v - 1][u - 1] = 1
 
     def grau(self, v: int, rep: str = 'list') -> int:
@@ -55,6 +59,9 @@ class Grafo:
         """
         if v < 1 or v > self.n:
             raise ValueError(f"Vértice fora do intervalo: {v}")
+        if rep is None:
+            rep = self.default_rep
+
         if rep == 'list':
             return len(self.lista_adj[v - 1])
         elif rep == 'matrix':
@@ -214,7 +221,7 @@ class Grafo:
         print(f"Resultados salvos em '{arquivo_saida}'")
 
     @classmethod
-    def from_file(cls, path: str) -> 'Grafo':
+    def from_file(cls, path: str, default_rep: str = 'list') -> 'Grafo':
         """Lê um grafo de um arquivo texto.
 
         Formato esperado:
@@ -238,7 +245,7 @@ class Grafo:
             else:
                 raise ValueError("Arquivo vazio ou sem número de vértices")
 
-            grafo = cls(n)
+            grafo = cls(n, default_rep=default_rep)
 
             for raw in f:
                 raw = raw.strip()
