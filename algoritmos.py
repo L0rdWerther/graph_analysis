@@ -2,117 +2,308 @@ from collections import deque
 
 
 class Grafo:
-    """Classe para representar um grafo"""
+    """Representação de grafo que mantém simultaneamente lista de adjacência
+    e matriz de adjacência. Os vértices no arquivo de entrada são esperados
+    como 1..n (base 1). Internamente as estruturas usam índices 0..n-1, mas
+    os métodos públicos aceitam vértices em base 1.
 
-    def __init__(self, n, direcionado=False):
-        """
-        Inicializa o grafo
+    A classe fornece:
+    - adicionar_aresta(u, v)
+    - grau(v, rep='list'|'matrix')
+    - num_arestas()
+    - from_file(path) -> Grafo (classmethod)
+    - write_summary(path, rep='list'|'matrix'|'both')
+    - bfs(inicio, arquivo_saida) - Busca em largura
+    - dfs(inicio, arquivo_saida) - Busca em profundidade
+    - componentes_conexos(arquivo_saida) - Encontra componentes conexos
+    """
 
-        Args:
-            n: número de vértices
-            direcionado: se o grafo é direcionado ou não
-        """
-        self.n = n
+    def __init__(self, n: int, direcionado: bool = False):
+        self.n = int(n)
         self.direcionado = direcionado
-        self.lista_adj = [[] for _ in range(n)]
+        # lista de adjacência: cada entrada armazena vértices em base 1
+        self.lista_adj = [[] for _ in range(self.n)]
+        # matriz de adjacência (0/1)
+        self.matriz_adj = [[0] * self.n for _ in range(self.n)]
 
-    def adicionar_aresta(self, u, v):
-        """
-        Adiciona uma aresta entre os vértices u e v (0-indexed)
+    def adicionar_aresta(self, u: int, v: int) -> None:
+        """Adiciona aresta entre u e v. u/v são 1-based.
 
-        Args:
-            u: vértice origem
-            v: vértice destino
+        Permite múltiplas chamadas para a mesma aresta; se já existir, mantém
+        a representação como se fosse um grafo simples (sem paralelas) na
+        matriz, e na lista pode duplicar se o usuário inserir várias vezes.
         """
-        self.lista_adj[u].append(v)
+        if u < 1 or v < 1 or u > self.n or v > self.n:
+            raise ValueError(f"Vértice fora do intervalo: {u}, {v}")
+
+        # lista armazena vértices em base 1 (para facilitar leitura/escrita)
+        if v not in self.lista_adj[u - 1]:
+            self.lista_adj[u - 1].append(v)
+
         if not self.direcionado:
-            self.lista_adj[v].append(u)
+            if u not in self.lista_adj[v - 1]:
+                self.lista_adj[v - 1].append(u)
 
-    def bfs(self, inicio, arquivo_saida="bfs_resultado.txt"):
+        # matriz é 0/1
+        self.matriz_adj[u - 1][v - 1] = 1
+        if not self.direcionado:
+            self.matriz_adj[v - 1][u - 1] = 1
+
+    def grau(self, v: int, rep: str = 'list') -> int:
+        """Retorna o grau do vértice v (1-based).
+
+        rep escolhe a representação usada para calcular o grau: 'list' ou
+        'matrix'. Por padrão usa a lista de adjacência.
         """
-        Executa busca em largura (BFS) a partir do vértice inicial
+        if v < 1 or v > self.n:
+            raise ValueError(f"Vértice fora do intervalo: {v}")
+        if rep == 'list':
+            return len(self.lista_adj[v - 1])
+        elif rep == 'matrix':
+            return sum(self.matriz_adj[v - 1])
+        else:
+            raise ValueError("rep deve ser 'list' ou 'matrix'")
+
+    def num_arestas(self, rep: str = 'list') -> int:
+        """Retorna número de arestas.
 
         Args:
-            inicio: vértice inicial (0-indexed)
+            rep: 'list' para usar lista de adjacência, 'matrix' para matriz
+        """
+        if rep == 'list':
+            total_grau = sum(len(adj) for adj in self.lista_adj)
+            return total_grau // 2 if not self.direcionado else total_grau
+        elif rep == 'matrix':
+            total = sum(sum(linha) for linha in self.matriz_adj)
+            return total // 2 if not self.direcionado else total
+        else:
+            raise ValueError("rep deve ser 'list' ou 'matrix'")
+
+    def bfs(self, inicio: int, arquivo_saida: str = "bfs_resultado.txt"):
+        """Executa busca em largura (BFS) a partir do vértice inicial (1-based).
+
+        Args:
+            inicio: vértice inicial (1-based)
             arquivo_saida: nome do arquivo para salvar os resultados
 
         Returns:
-            tuple: (pai, nivel) - vetores com o pai e nível de cada vértice
+            tuple: (pai, nivel) - vetores com o pai e nível de cada vértice (1-based)
         """
+        if inicio < 1 or inicio > self.n:
+            raise ValueError(f"Vértice inicial fora do intervalo: {inicio}")
+
+        # Trabalha internamente com índices 0-based
+        inicio_idx = inicio - 1
+
         visitado = [False] * self.n
         nivel = [-1] * self.n
         pai = [-1] * self.n
 
-        fila = deque([inicio])
-        visitado[inicio] = True
-        nivel[inicio] = 0
+        fila = deque([inicio_idx])
+        visitado[inicio_idx] = True
+        nivel[inicio_idx] = 0
 
         while fila:
-            u = fila.popleft()
-            for v in self.lista_adj[u]:
-                if not visitado[v]:
-                    visitado[v] = True
-                    pai[v] = u
-                    nivel[v] = nivel[u] + 1
-                    fila.append(v)
+            u_idx = fila.popleft()
+            # lista_adj armazena vértices em base 1
+            for v in self.lista_adj[u_idx]:
+                v_idx = v - 1
+                if not visitado[v_idx]:
+                    visitado[v_idx] = True
+                    pai[v_idx] = u_idx + 1  # armazena pai em base 1
+                    nivel[v_idx] = nivel[u_idx] + 1
+                    fila.append(v_idx)
 
         # Salvar resultados em arquivo
         self._salvar_resultado(pai, nivel, "BFS", arquivo_saida)
 
         return pai, nivel
 
-    def dfs(self, inicio, arquivo_saida="dfs_resultado.txt"):
-        """
-        Executa busca em profundidade (DFS) a partir do vértice inicial
+    def dfs(self, inicio: int, arquivo_saida: str = "dfs_resultado.txt"):
+        """Executa busca em profundidade (DFS) a partir do vértice inicial (1-based).
 
         Args:
-            inicio: vértice inicial (0-indexed)
+            inicio: vértice inicial (1-based)
             arquivo_saida: nome do arquivo para salvar os resultados
 
         Returns:
-            tuple: (pai, nivel) - vetores com o pai e nível de cada vértice
+            tuple: (pai, nivel) - vetores com o pai e nível de cada vértice (1-based)
         """
+        if inicio < 1 or inicio > self.n:
+            raise ValueError(f"Vértice inicial fora do intervalo: {inicio}")
+
+        inicio_idx = inicio - 1
+
         visitado = [False] * self.n
         nivel = [-1] * self.n
         pai = [-1] * self.n
 
-        nivel[inicio] = 0
-        self._dfs_recursivo(inicio, visitado, nivel, pai)
+        nivel[inicio_idx] = 0
+        self._dfs_recursivo(inicio_idx, visitado, nivel, pai)
 
         # Salvar resultados em arquivo
         self._salvar_resultado(pai, nivel, "DFS", arquivo_saida)
 
         return pai, nivel
 
-    def _dfs_recursivo(self, u, visitado, nivel, pai):
-        """Função auxiliar recursiva para DFS"""
-        visitado[u] = True
+    def _dfs_recursivo(self, u_idx: int, visitado: list, nivel: list, pai: list):
+        """Função auxiliar recursiva para DFS (trabalha com índices 0-based)"""
+        visitado[u_idx] = True
 
-        for v in self.lista_adj[u]:
-            if not visitado[v]:
-                pai[v] = u
-                nivel[v] = nivel[u] + 1
-                self._dfs_recursivo(v, visitado, nivel, pai)
+        # lista_adj armazena vértices em base 1
+        for v in self.lista_adj[u_idx]:
+            v_idx = v - 1
+            if not visitado[v_idx]:
+                pai[v_idx] = u_idx + 1  # armazena pai em base 1
+                nivel[v_idx] = nivel[u_idx] + 1
+                self._dfs_recursivo(v_idx, visitado, nivel, pai)
 
-    def _salvar_resultado(self, pai, nivel, tipo_busca, arquivo_saida):
-        """
-        Salva os resultados da busca em arquivo
+    def componentes_conexos(self, arquivo_saida: str = "componentes_resultado.txt"):
+        """Encontra os componentes conexos do grafo.
 
         Args:
-            pai: vetor de pais
-            nivel: vetor de níveis
-            tipo_busca: "BFS" ou "DFS"
-            arquivo_saida: nome do arquivo
+            arquivo_saida: nome do arquivo para salvar os resultados
+
+        Returns:
+            list: lista de componentes, onde cada componente é uma lista de vértices (1-based)
         """
+        visitado = [False] * self.n
+        componentes = []
+
+        for v_idx in range(self.n):
+            if not visitado[v_idx]:
+                componente = []
+                self._dfs_componente(v_idx, visitado, componente)
+                # Converte para base 1 e ordena
+                componente_base1 = sorted([v + 1 for v in componente])
+                componentes.append(componente_base1)
+
+        # Salvar resultados em arquivo
+        self._salvar_componentes(componentes, arquivo_saida)
+
+        return componentes
+
+    def _dfs_componente(self, u_idx: int, visitado: list, componente: list):
+        """Função auxiliar DFS para encontrar componentes conexos (trabalha com índices 0-based)"""
+        visitado[u_idx] = True
+        componente.append(u_idx)
+
+        # lista_adj armazena vértices em base 1
+        for v in self.lista_adj[u_idx]:
+            v_idx = v - 1
+            if not visitado[v_idx]:
+                self._dfs_componente(v_idx, visitado, componente)
+
+    def _salvar_componentes(self, componentes: list, arquivo_saida: str):
+        """Salva os componentes conexos em arquivo."""
+        with open(arquivo_saida, 'w', encoding='utf-8') as f:
+            f.write("COMPONENTES CONEXOS\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(f"Número de componentes: {len(componentes)}\n\n")
+
+            for i, comp in enumerate(componentes, 1):
+                f.write(f"Componente {i}:\n")
+                f.write(f"  Tamanho: {len(comp)} vértices\n")
+                f.write(f"  Vértices: {comp}\n\n")
+
+        print(f"Resultados salvos em '{arquivo_saida}'")
+
+    def _salvar_resultado(self, pai: list, nivel: list, tipo_busca: str, arquivo_saida: str):
+        """Salva os resultados da busca em arquivo."""
         with open(arquivo_saida, 'w', encoding='utf-8') as f:
             f.write(f"Resultado da busca {tipo_busca}\n")
             f.write("=" * 50 + "\n\n")
             f.write(f"{'Vértice':<10} {'Pai':<10} {'Nível':<10}\n")
             f.write("-" * 50 + "\n")
 
-            for v in range(self.n):
-                pai_str = str(pai[v]) if pai[v] != -1 else "raiz"
-                nivel_str = str(nivel[v]) if nivel[v] != -1 else "não visitado"
+            for v_idx in range(self.n):
+                v = v_idx + 1  # converte para base 1
+                pai_str = str(pai[v_idx]) if pai[v_idx] != -1 else "raiz"
+                nivel_str = str(nivel[v_idx]) if nivel[v_idx] != -1 else "não visitado"
                 f.write(f"{v:<10} {pai_str:<10} {nivel_str:<10}\n")
 
         print(f"Resultados salvos em '{arquivo_saida}'")
+
+    @classmethod
+    def from_file(cls, path: str) -> 'Grafo':
+        """Lê um grafo de um arquivo texto.
+
+        Formato esperado:
+        - primeira linha: número de vértices (inteiro)
+        - segunda linha (opcional): 'direcionado' ou 'nao-direcionado' (padrão: nao-direcionado)
+        - linhas subsequentes: arestas, cada linha com dois inteiros u v
+          (u e v em base 1). Linhas vazias e comentários (começando com '#')
+          são ignoradas.
+        """
+        with open(path, 'r', encoding='utf-8') as f:
+            lines = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
+
+            if not lines:
+                raise ValueError("Arquivo vazio ou sem número de vértices")
+
+            # Primeira linha: número de vértices
+            try:
+                n = int(lines[0].split()[0])
+            except ValueError as e:
+                raise ValueError(f"Formato inválido na primeira linha: {lines[0]}") from e
+
+            # Segunda linha opcional: tipo do grafo
+            direcionado = False
+            start_idx = 1
+            if len(lines) > 1 and lines[1].lower() in ('direcionado', 'nao-direcionado', 'não-direcionado'):
+                direcionado = (lines[1].lower() == 'direcionado')
+                start_idx = 2
+
+            grafo = cls(n, direcionado)
+
+            # Ler arestas
+            for raw in lines[start_idx:]:
+                parts = raw.split()
+                if len(parts) < 2:
+                    continue
+                try:
+                    u = int(parts[0])
+                    v = int(parts[1])
+                except ValueError:
+                    continue
+                grafo.adicionar_aresta(u, v)
+
+        return grafo
+
+    def write_summary(self, path: str, rep: str = 'list') -> None:
+        """Escreve um arquivo texto com:
+        - número de vértices
+        - número de arestas
+        - grau de cada vértice (uma linha por vértice)
+
+        rep pode ser 'list', 'matrix' ou 'both'.
+        """
+        if rep not in ('list', 'matrix', 'both'):
+            raise ValueError("rep deve ser 'list', 'matrix' ou 'both'")
+
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(f"Número de vértices: {self.n}\n")
+
+            # Para 'both', mostramos ambas as contagens se diferentes
+            if rep == 'both':
+                m_list = self.num_arestas('list')
+                m_mat = self.num_arestas('matrix')
+                if m_list == m_mat:
+                    f.write(f"Número de arestas: {m_list}\n")
+                else:
+                    f.write(f"Número de arestas: lista={m_list}, matriz={m_mat}\n")
+            else:
+                f.write(f"Número de arestas: {self.num_arestas(rep)}\n")
+
+            f.write("Grau dos vértices:\n")
+            for i in range(1, self.n + 1):
+                if rep == 'both':
+                    g_list = self.grau(i, 'list')
+                    g_mat = self.grau(i, 'matrix')
+                    f.write(f"{i}: lista={g_list}, matriz={g_mat}\n")
+                else:
+                    g = self.grau(i, rep)
+                    f.write(f"{i}: {g}\n")
+
+    def __repr__(self) -> str:
+        return f"Grafo(n={self.n}, edges={self.num_arestas()})"

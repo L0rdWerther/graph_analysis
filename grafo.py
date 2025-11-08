@@ -2,77 +2,112 @@ from collections import deque
 
 
 class Grafo:
-    """Representação de grafo que mantém simultaneamente lista de adjacência
-    e matriz de adjacência. Os vértices no arquivo de entrada são esperados
-    como 1..n (base 1). Internamente as estruturas usam índices 0..n-1, mas
-    os métodos públicos aceitam vértices em base 1.
+    """Representação de grafo com escolha de representação (lista ou matriz).
+
+    O usuário escolhe a representação a ser utilizada no construtor.
+    Os vértices no arquivo de entrada são esperados como 1..n (base 1).
+    Internamente as estruturas usam índices 0..n-1, mas os métodos públicos
+    aceitam vértices em base 1.
 
     A classe fornece:
     - adicionar_aresta(u, v)
-    - grau(v, rep='list'|'matrix')
+    - grau(v)
     - num_arestas()
-    - from_file(path) -> Grafo (classmethod)
-    - write_summary(path, rep='list'|'matrix'|'both')
+    - from_file(path, rep='list'|'matrix') -> Grafo (classmethod)
+    - write_summary(path)
     - bfs(inicio, arquivo_saida) - Busca em largura
     - dfs(inicio, arquivo_saida) - Busca em profundidade
     - componentes_conexos(arquivo_saida) - Encontra componentes conexos
+    - get_vizinhos(v) - Retorna lista de vizinhos do vértice v
     """
 
-    def __init__(self, n: int, direcionado: bool = False, default_rep: str = 'list'):
+    def __init__(self, n: int, representacao: str = 'list', direcionado: bool = False):
+        """Inicializa o grafo com a representação escolhida.
+
+        Args:
+            n: número de vértices
+            representacao: 'list' para lista de adjacência, 'matrix' para matriz
+            direcionado: True para grafo direcionado, False para não direcionado
+        """
+        if representacao not in ('list', 'matrix'):
+            raise ValueError("representacao deve ser 'list' ou 'matrix'")
+
         self.n = int(n)
         self.direcionado = bool(direcionado)
-        # lista de adjacência: cada entrada armazena vértices em base 1
-        self.lista_adj = [[] for _ in range(self.n)]
-        # matriz de adjacência (0/1)
-        self.matriz_adj = [[0] * self.n for _ in range(self.n)]
-        if default_rep not in ('list', 'matrix'):
-            raise ValueError("default_rep deve ser 'list' ou 'matrix'")
-        self.default_rep = default_rep
+        self.representacao = representacao
+
+        if self.representacao == 'list':
+            # Lista de adjacência: cada entrada armazena vértices em base 1
+            self.lista_adj = [[] for _ in range(self.n)]
+        else:  # matriz
+            # Matriz de adjacência (0/1)
+            self.matriz_adj = [[0] * self.n for _ in range(self.n)]
 
     def adicionar_aresta(self, u: int, v: int) -> None:
-        """Adiciona aresta não direcionada entre u e v. u/v são 1-based.
+        """Adiciona aresta entre u e v. u/v são 1-based.
 
-        Permite múltiplas chamadas para a mesma aresta; se já existir, mantém
-        a representação como se fosse um grafo simples (sem paralelas) na
-        matriz, e na lista pode duplicar se o usuário inserir várias vezes.
+        Permite múltiplas chamadas para a mesma aresta; mantém a representação
+        como se fosse um grafo simples (sem arestas paralelas).
         """
         if u < 1 or v < 1 or u > self.n or v > self.n:
             raise ValueError(f"Vértice fora do intervalo: {u}, {v}")
 
-        # lista armazena vértices em base 1 (para facilitar leitura/escrita)
-        if v not in self.lista_adj[u - 1]:
-            self.lista_adj[u - 1].append(v)
-        # matriz é 0/1 para aresta u->v
-        self.matriz_adj[u - 1][v - 1] = 1
-
-        if not self.direcionado:
-            # se não direcionado, adicionar também v->u
-            if u not in self.lista_adj[v - 1]:
+        if self.representacao == 'list':
+            # Lista armazena vértices em base 1
+            if v not in self.lista_adj[u - 1]:
+                self.lista_adj[u - 1].append(v)
+            if not self.direcionado and u not in self.lista_adj[v - 1]:
                 self.lista_adj[v - 1].append(u)
-            self.matriz_adj[v - 1][u - 1] = 1
+        else:  # matriz
+            self.matriz_adj[u - 1][v - 1] = 1
+            if not self.direcionado:
+                self.matriz_adj[v - 1][u - 1] = 1
 
-    def grau(self, v: int, rep: str = 'list') -> int:
-        """Retorna o grau do vértice v (1-based).
+    def get_vizinhos(self, v: int) -> list:
+        """Retorna lista de vizinhos do vértice v (1-based).
 
-        rep escolhe a representação usada para calcular o grau: 'list' ou
-        'matrix'. Por padrão usa a lista de adjacência.
+        Args:
+            v: vértice (1-based)
+
+        Returns:
+            Lista de vizinhos em base 1
         """
         if v < 1 or v > self.n:
             raise ValueError(f"Vértice fora do intervalo: {v}")
-        if rep is None:
-            rep = self.default_rep
 
-        if rep == 'list':
+        if self.representacao == 'list':
+            return self.lista_adj[v - 1].copy()
+        else:  # matriz
+            vizinhos = []
+            for i in range(self.n):
+                if self.matriz_adj[v - 1][i] == 1:
+                    vizinhos.append(i + 1)  # retorna em base 1
+            return vizinhos
+
+    def grau(self, v: int) -> int:
+        """Retorna o grau do vértice v (1-based).
+
+        Args:
+            v: vértice (1-based)
+
+        Returns:
+            Grau do vértice
+        """
+        if v < 1 or v > self.n:
+            raise ValueError(f"Vértice fora do intervalo: {v}")
+
+        if self.representacao == 'list':
             return len(self.lista_adj[v - 1])
-        elif rep == 'matrix':
+        else:  # matriz
             return sum(self.matriz_adj[v - 1])
-        else:
-            raise ValueError("rep deve ser 'list' ou 'matrix'")
 
     def num_arestas(self) -> int:
-        """Retorna número de arestas (grafo não direcionado)."""
-        # soma dos graus / 2
-        total_grau = sum(len(adj) for adj in self.lista_adj)
+        """Retorna número de arestas."""
+        if self.representacao == 'list':
+            total_grau = sum(len(adj) for adj in self.lista_adj)
+        else:  # matriz
+            total_grau = sum(sum(linha) for linha in self.matriz_adj)
+
         return total_grau // 2 if not self.direcionado else total_grau
 
     def bfs(self, inicio: int, arquivo_saida: str = "bfs_resultado.txt"):
@@ -88,7 +123,6 @@ class Grafo:
         if inicio < 1 or inicio > self.n:
             raise ValueError(f"Vértice inicial fora do intervalo: {inicio}")
 
-        # Trabalha internamente com índices 0-based
         inicio_idx = inicio - 1
 
         visitado = [False] * self.n
@@ -101,12 +135,14 @@ class Grafo:
 
         while fila:
             u_idx = fila.popleft()
-            # lista_adj armazena vértices em base 1
-            for v in self.lista_adj[u_idx]:
+            u = u_idx + 1  # converte para base 1
+
+            # Obtém vizinhos usando o método get_vizinhos
+            for v in self.get_vizinhos(u):
                 v_idx = v - 1
                 if not visitado[v_idx]:
                     visitado[v_idx] = True
-                    pai[v_idx] = u_idx + 1  # armazena pai em base 1
+                    pai[v_idx] = u  # armazena pai em base 1
                     nivel[v_idx] = nivel[u_idx] + 1
                     fila.append(v_idx)
 
@@ -145,12 +181,13 @@ class Grafo:
     def _dfs_recursivo(self, u_idx: int, visitado: list, nivel: list, pai: list):
         """Função auxiliar recursiva para DFS (trabalha com índices 0-based)"""
         visitado[u_idx] = True
+        u = u_idx + 1  # converte para base 1
 
-        # lista_adj armazena vértices em base 1
-        for v in self.lista_adj[u_idx]:
+        # Obtém vizinhos usando o método get_vizinhos
+        for v in self.get_vizinhos(u):
             v_idx = v - 1
             if not visitado[v_idx]:
-                pai[v_idx] = u_idx + 1  # armazena pai em base 1
+                pai[v_idx] = u  # armazena pai em base 1
                 nivel[v_idx] = nivel[u_idx] + 1
                 self._dfs_recursivo(v_idx, visitado, nivel, pai)
 
@@ -183,9 +220,10 @@ class Grafo:
         """Função auxiliar DFS para encontrar componentes conexos (trabalha com índices 0-based)"""
         visitado[u_idx] = True
         componente.append(u_idx)
+        u = u_idx + 1  # converte para base 1
 
-        # lista_adj armazena vértices em base 1
-        for v in self.lista_adj[u_idx]:
+        # Obtém vizinhos usando o método get_vizinhos
+        for v in self.get_vizinhos(u):
             v_idx = v - 1
             if not visitado[v_idx]:
                 self._dfs_componente(v_idx, visitado, componente)
@@ -195,6 +233,7 @@ class Grafo:
         with open(arquivo_saida, 'w', encoding='utf-8') as f:
             f.write("COMPONENTES CONEXOS\n")
             f.write("=" * 50 + "\n\n")
+            f.write(f"Representação utilizada: {self.representacao}\n")
             f.write(f"Número de componentes: {len(componentes)}\n\n")
 
             for i, comp in enumerate(componentes, 1):
@@ -209,6 +248,7 @@ class Grafo:
         with open(arquivo_saida, 'w', encoding='utf-8') as f:
             f.write(f"Resultado da busca {tipo_busca}\n")
             f.write("=" * 50 + "\n\n")
+            f.write(f"Representação utilizada: {self.representacao}\n\n")
             f.write(f"{'Vértice':<10} {'Pai':<10} {'Nível':<10}\n")
             f.write("-" * 50 + "\n")
 
@@ -221,73 +261,90 @@ class Grafo:
         print(f"Resultados salvos em '{arquivo_saida}'")
 
     @classmethod
-    def from_file(cls, path: str, default_rep: str = 'list') -> 'Grafo':
+    def from_file(cls, path: str, representacao: str = 'list') -> 'Grafo':
         """Lê um grafo de um arquivo texto.
+
+        Args:
+            path: caminho do arquivo
+            representacao: 'list' para lista de adjacência, 'matrix' para matriz
 
         Formato esperado:
         - primeira linha: número de vértices (inteiro)
+        - segunda linha (opcional): 'direcionado' ou 'nao-direcionado' (padrão: nao-direcionado)
         - linhas subsequentes: arestas, cada linha com dois inteiros u v
           (u e v em base 1). Linhas vazias e comentários (começando com '#')
           são ignoradas.
         """
         with open(path, 'r', encoding='utf-8') as f:
-            # pular linhas em branco até achar um número
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-                # primeira linha útil: número de vértices
-                try:
-                    n = int(line.split()[0])
-                except ValueError as e:
-                    raise ValueError(f"Formato inválido na primeira linha: {line}") from e
-                break
-            else:
+            lines = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
+
+            if not lines:
                 raise ValueError("Arquivo vazio ou sem número de vértices")
 
-            grafo = cls(n, default_rep=default_rep)
+            # Primeira linha: número de vértices
+            try:
+                n = int(lines[0].split()[0])
+            except ValueError as e:
+                raise ValueError(f"Formato inválido na primeira linha: {lines[0]}") from e
 
-            for raw in f:
-                raw = raw.strip()
-                if not raw or raw.startswith('#'):
-                    continue
+            # Segunda linha opcional: tipo do grafo
+            direcionado = False
+            start_idx = 1
+            if len(lines) > 1 and lines[1].lower() in ('direcionado', 'nao-direcionado', 'não-direcionado'):
+                direcionado = (lines[1].lower() == 'direcionado')
+                start_idx = 2
+
+            grafo = cls(n, representacao=representacao, direcionado=direcionado)
+
+            # Ler arestas
+            for raw in lines[start_idx:]:
                 parts = raw.split()
                 if len(parts) < 2:
-                    # ignora linhas que não tenham ao menos dois números
                     continue
                 try:
                     u = int(parts[0])
                     v = int(parts[1])
                 except ValueError:
-                    # ignora linhas malformadas
                     continue
                 grafo.adicionar_aresta(u, v)
 
         return grafo
 
-    def write_summary(self, path: str, rep: str = 'list') -> None:
+    def write_summary(self, path: str) -> None:
         """Escreve um arquivo texto com:
+        - representação utilizada
         - número de vértices
         - número de arestas
         - grau de cada vértice (uma linha por vértice)
-
-        rep pode ser 'list', 'matrix' ou 'both'.
         """
-        if rep not in ('list', 'matrix', 'both'):
-            raise ValueError("rep deve ser 'list', 'matrix' ou 'both'")
-
         with open(path, 'w', encoding='utf-8') as f:
+            f.write(f"Representação: {self.representacao}\n")
+            f.write(f"Tipo: {'direcionado' if self.direcionado else 'não direcionado'}\n")
             f.write(f"Número de vértices: {self.n}\n")
-            f.write(f"Número de arestas: {self.num_arestas()}\n")
+            f.write(f"Número de arestas: {self.num_arestas()}\n\n")
+
             f.write("Grau dos vértices:\n")
             for i in range(1, self.n + 1):
-                if rep == 'both':
-                    g_list = self.grau(i, 'list')
-                    g_mat = self.grau(i, 'matrix')
-                    f.write(f"{i}: lista={g_list}, matriz={g_mat}\n")
-                else:
-                    g = self.grau(i, rep)
-                    f.write(f"{i}: {g}\n")
+                f.write(f"{i}: {self.grau(i)}\n")
+
+    def imprimir_representacao(self):
+        """Imprime a representação do grafo (para debug)."""
+        print(f"\nRepresentação: {self.representacao}")
+        print(f"Tipo: {'direcionado' if self.direcionado else 'não direcionado'}")
+        print(f"Vértices: {self.n}, Arestas: {self.num_arestas()}\n")
+
+        if self.representacao == 'list':
+            print("Lista de Adjacência:")
+            for i in range(self.n):
+                print(f"  {i + 1}: {self.lista_adj[i]}")
+        else:
+            print("Matriz de Adjacência:")
+            print("     " + "  ".join(str(i + 1) for i in range(self.n)))
+            print("   ┌" + "─" * (3 * self.n + 1) + "┐")
+            for i in range(self.n):
+                linha = "  ".join(str(self.matriz_adj[i][j]) for j in range(self.n))
+                print(f"{i + 1}  │ {linha} │")
+            print("   └" + "─" * (3 * self.n + 1) + "┘")
 
     def __repr__(self) -> str:
-        return f"Grafo(n={self.n}, edges={self.num_arestas()})"
+        return f"Grafo(n={self.n}, edges={self.num_arestas()}, rep={self.representacao})"
