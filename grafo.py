@@ -318,14 +318,10 @@ class Grafo:
         - grau de cada vértice (uma linha por vértice)
         """
         with open(path, 'w', encoding='utf-8') as f:
-            f.write(f"Representação: {self.representacao}\n")
-            f.write(f"Tipo: {'direcionado' if self.direcionado else 'não direcionado'}\n")
-            f.write(f"Número de vértices: {self.n}\n")
-            f.write(f"Número de arestas: {self.num_arestas()}\n\n")
-
-            f.write("Grau dos vértices:\n")
+            f.write(f"# n = {self.n}\n")
+            f.write(f"# m = {self.num_arestas()}\n")
             for i in range(1, self.n + 1):
-                f.write(f"{i}: {self.grau(i)}\n")
+                f.write(f"{i} {self.grau(i)}\n")
 
     def imprimir_representacao(self):
         """Imprime a representação do grafo (para debug)."""
