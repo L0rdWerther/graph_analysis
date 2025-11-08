@@ -91,3 +91,9 @@ saida.txt
 bfs_resultado.txt
 componentes_resultado.txt
 dfs_resultado.txt
+# outputs variations
+saida*.txt
+*_matrix.txt
+bfs_resultado*.txt
+dfs_resultado*.txt
+componentes_resultado*.txt

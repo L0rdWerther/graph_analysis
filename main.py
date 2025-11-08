@@ -153,23 +153,30 @@ def main():
         print(f"Erro ao ler '{args.input}': {e}")
         return 1
 
-    # Escrever resumo básico
+    # Escrever resumo(s) básico(s)
     try:
-        g.write_summary(args.output, rep=args.rep)
+        if args.rep == 'both':
+            # quando o usuário pede 'both', geramos dois arquivos separados
+            # - o arquivo principal (args.output) conterá a versão por lista
+            # - um arquivo adicional com sufixo _matrix conterá a versão por matriz
+            import os
+            g.write_summary(args.output, rep='list')
+            base, ext = os.path.splitext(args.output)
+            matrix_output = f"{base}_matrix{ext}" if ext else f"{args.output}_matrix"
+            g.write_summary(matrix_output, rep='matrix')
+        else:
+            g.write_summary(args.output, rep=args.rep)
     except Exception as e:
         print(f"Erro ao escrever '{args.output}': {e}")
         return 1
 
-    # Relatório curto no console
+    # Relatório curto no console (formato simples: '# n', '# m', then 'v grau')
     print(f"# n = {g.n}")
     print(f"# m = {g.num_arestas()}")
+    # escolha qual representação mostrar no console (mantemos formato: 'v grau')
+    display_rep = 'list' if args.rep == 'both' else args.rep
     for i in range(1, g.n + 1):
-        if args.rep == 'both':
-            gl = g.grau(i, 'list')
-            gm = g.grau(i, 'matrix')
-            print(f"{i} lista={gl}, matriz={gm}")
-        else:
-            print(f"{i} {g.grau(i, args.rep)}")
+        print(f"{i} {g.grau(i, display_rep)}")
 
     print('\nResumo escrito com sucesso.')
 
