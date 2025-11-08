@@ -71,6 +71,7 @@ projeto-grafos/
      bfs_resultado.txt
      dfs_resultado.txt
      componentes_resultado.txt
+     saida.txt
      ```
 
 ---
@@ -98,6 +99,7 @@ projeto-grafos/
      bfs_resultado.txt
      dfs_resultado.txt
      componentes_resultado.txt
+     saida.txt
      ```
 
 ---
