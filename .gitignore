@@ -86,5 +86,8 @@ $RECYCLE.BIN/
 # Editor backup files
 *~
 
-#arquivo de saida
+#arquivos de saida
 saida.txt
+bfs_resultado.txt
+componentes_resultado.txt
+dfs_resultado.txt
