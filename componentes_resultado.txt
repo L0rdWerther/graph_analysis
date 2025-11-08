@@ -1,9 +1,0 @@
-COMPONENTES CONEXOS
-==================================================
-
-Número de componentes: 1
-
-Componente 1:
-  Tamanho: 5 vértices
-  Vértices: [1, 2, 3, 4, 5]
-
