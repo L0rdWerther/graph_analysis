@@ -51,7 +51,7 @@ projeto-grafos/
      **ou** use o Git:
 
      ```bash
-     git clone https://github.com/seuusuario/graph_analysis.git
+     git clone https://github.com/L0rdWerther/graph_analysis.git
      cd graph_analysis
      ```
 
@@ -81,7 +81,7 @@ projeto-grafos/
 1. **Clone o repositório:**
 
    ```bash
-   git clone https://github.com/seuusuario/graph_analysis.git
+   git clone https://github.com/L0rdWerther/graph_analysis.git
    cd graph_analysis
    ```
 
