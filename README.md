@@ -1,111 +1,58 @@
-## Teoria dos Grafos — Graph_Analysis
+C Graph Analysis
 
-### Parte 1
+This project mirrors the Python `graph_analysis` runner but in C.
 
-O objetivo deste trabalho é projetar e desenvolver uma **biblioteca para manipulação de grafos**.
-A biblioteca deve ser capaz de:
+Features:
+- Read a graph from a text file: first line = number of vertices n, subsequent lines are edges `u v` (1-based).
+- Support two representations selectable at runtime: adjacency list (`list`) and adjacency matrix (`matrix`).
+- Write a summary file with n, m, and degree per vertex.
+- Provide BFS, DFS, and connected components routines.
 
-* Representar **grafos simples e não dirigidos**;
-* Implementar um conjunto básico de **algoritmos e operações sobre grafos**.
+Build
 
-*Para esta primeira parte, o foco está na representação do grafo e na leitura de arquivos de entrada.*
+Make sure you have a C compiler (gcc/clang). From the `graph_analysis_c` directory run:
 
----
+    make
 
-### Estrutura do Projeto
+Run
 
-```
-projeto-grafos/
-│
-├── algoritmos.py
-├── grafo.py
-├── main.py
-│
-├── entrada.txt
-├── as_graph.txt
-├── collaboration_graph.txt
-│
-├── bfs_resultado.txt
-├── componentes_resultado.txt
-│
-├── .gitignore
-└── README.md
-```
+    ./graph -i ../graph_analysis/entrada.txt -o saida.txt -r list
 
----
+Flags
 
-###  Como Executar
+  -i <file>    input graph file (default: stdin)
+  -o <file>    output summary file (default: saida.txt)
+  -r <type>    representation: list or matrix (default: list)
+  -b <v>       run BFS from vertex v (1-based)
+  -d <v>       run DFS from vertex v (1-based)
+  -c           compute connected components
+  --directed   treat graph as directed
 
-#### Pré-requisitos
+Notes
 
-* **Python 3.8** ou superior instalado no sistema;
-* **Editor de código** ou **terminal** configurado para executar scripts Python.
+- The adjacency-matrix implementation uses a contiguous byte array (n*n bytes). For very large n this may be impractical.
+- The adjacency-list uses dynamic arrays per vertex and is suitable for sparse graphs.
 
----
+Windows notes
 
-####  No Windows
+If you are on Windows, you can build with MinGW-w64 (gcc) or another compiler. This repository includes simple build scripts:
 
-1. **Baixe o repositório:**
+  - `build.bat` — batch file for cmd.exe
+  - `build.ps1` — PowerShell script
 
-   * Clique em **Code → Download ZIP** no GitHub e extraia os arquivos,
-     **ou** use o Git:
+Example (cmd.exe):
 
-     ```bash
-     git clone https://github.com/L0rdWerther/graph_analysis.git
-     cd graph_analysis
-     ```
+  cd "c:\Users\Tony\Documents\IFB DOCUMENTS\teoria_dos_grafos\Trabalho1\graph_analysis_c"
+  build.bat
 
-2. **Abra o terminal** (Prompt de Comando ou PowerShell) na pasta do projeto.
+Example (PowerShell):
 
-3. **Execute o programa:**
+  cd "c:\Users\Tony\Documents\IFB DOCUMENTS\teoria_dos_grafos\Trabalho1\graph_analysis_c"
+  .\build.ps1
 
-   ```bash
-   python main.py
-   ```
+After building you will have `graph.exe`. Run it like:
 
-4. **Verifique os resultados:**
+  .\graph.exe -i ..\graph_analysis\collaboration_graph.txt -o saida.txt -r list
 
-   * Os arquivos de saída serão gerados na mesma pasta:
-
-     ```
-     bfs_resultado.txt
-     dfs_resultado.txt
-     componentes_resultado.txt
-     saida.txt
-     ```
-
----
-
-#### No Linux
-
-1. **Clone o repositório:**
-
-   ```bash
-   git clone https://github.com/L0rdWerther/graph_analysis.git
-   cd graph_analysis
-   ```
-
-2. **Execute o programa:**
-
-   ```bash
-   python3 main.py
-   ```
-
-3. **Verifique os resultados:**
-
-   * Os arquivos de saída serão gerados na mesma pasta:
-
-     ```
-     bfs_resultado.txt
-     dfs_resultado.txt
-     componentes_resultado.txt
-     saida.txt
-     ```
-
----
-
-
-
-
-
+Be careful with the `matrix` representation on very large graphs (`n*n` bytes): it can require several gigabytes of RAM.
 
