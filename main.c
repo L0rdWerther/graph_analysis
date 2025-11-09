@@ -67,6 +67,7 @@ int main(int argc, char **argv){
     int do_comp = 0;
     int directed = 0;
     int do_measure = 0;
+    int do_bfs_measure = 0;
 
     for(int i=1;i<argc;i++){
         if(strcmp(argv[i], "-i") == 0 && i+1<argc) { input = argv[++i]; }
@@ -77,6 +78,7 @@ int main(int argc, char **argv){
         else if(strcmp(argv[i], "-c") == 0) { do_comp = 1; }
         else if(strcmp(argv[i], "--directed") == 0) { directed = 1; }
         else if(strcmp(argv[i], "--measure") == 0) { do_measure = 1; }
+        else if(strcmp(argv[i], "--bfs-measure") == 0) { do_bfs_measure = 1; }
         else { usage(argv[0]); return 1; }
     }
 
@@ -170,6 +172,78 @@ int main(int argc, char **argv){
     } else {
         g = grafo_carregar(input, rep, directed);
         if(!g){ fprintf(stderr, "Erro ao carregar grafo de '%s'\n", input); return 2; }
+    }
+
+    /* BFS timing measurement: sample several start vertices and report worst-case time */
+    if(do_bfs_measure){
+        struct {
+            const char *name;
+            int rep_type;
+            double worst_time;
+            int success;
+        } bfs_results[2] = {
+            {"list", REP_LIST, 0.0, 0},
+            {"matrix", REP_MATRIX, 0.0, 0}
+        };
+
+        for(int r=0;r<2;r++){
+            int rep_t = bfs_results[r].rep_type;
+            Grafo *g_local = NULL;
+            int own = 0; /* whether we must free g_local */
+
+            /* If main already loaded a graph with the same representation, reuse it to avoid double large allocations */
+            if(g != NULL && g->rep == rep_t){
+                g_local = g;
+                own = 0;
+            } else {
+                g_local = grafo_carregar(input, rep_t, directed);
+                own = 1;
+            }
+            if(!g_local){ bfs_results[r].success = 0; continue; }
+            bfs_results[r].success = 1;
+
+            int n = g_local->n;
+            /* find max-degree and min-degree vertices */
+            int max_idx = 1, min_idx = 1;
+            int max_deg = g_local->deg[0], min_deg = g_local->deg[0];
+            for(int i=1;i<n;i++){
+                if(g_local->deg[i] > max_deg){ max_deg = g_local->deg[i]; max_idx = i+1; }
+                if(g_local->deg[i] < min_deg){ min_deg = g_local->deg[i]; min_idx = i+1; }
+            }
+
+            int samples[7]; int sample_count = 0;
+            samples[sample_count++] = max_idx;
+            samples[sample_count++] = min_idx;
+            for(int k=0;k<5;k++){
+                int v = 1 + (int)((long long)k * n / 5);
+                if(v < 1) v = 1; if(v > n) v = n;
+                samples[sample_count++] = v;
+            }
+
+            double worst = 0.0;
+            for(int s=0;s<sample_count;s++){
+                int start = samples[s];
+                double t0 = now_seconds();
+                int *level = NULL;
+                int *pai = grafo_bfs(g_local, start, &level);
+                double t1 = now_seconds();
+                if(pai){ free(pai); if(level) free(level); }
+                double elapsed = t1 - t0;
+                if(elapsed > worst) worst = elapsed;
+            }
+
+            bfs_results[r].worst_time = worst;
+            if(own) grafo_destruir(g_local);
+        }
+
+        printf("\n=== BFS worst-case timing (sampled) ===\n");
+        printf("Representation | Worst BFS time (s)\n");
+        printf("---------------+--------------------\n");
+        for(int r=0;r<2;r++){
+            if(!bfs_results[r].success) printf("%-15s | %s\n", bfs_results[r].name, "FAILED");
+            else printf("%-15s | %20.6f\n", bfs_results[r].name, bfs_results[r].worst_time);
+        }
+        printf("=====================================\n\n");
     }
 
     printf("Grafo carregado. n=%d m=%d rep=%s\n", g->n, g->m, rep==REP_LIST?"list":"matrix");
