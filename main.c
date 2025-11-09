@@ -278,12 +278,41 @@ int main(int argc, char **argv){
     if(do_comp){
         int **comps = NULL; int *sizes = NULL;
         int k = grafo_componentes(g, &comps, &sizes);
-        printf("%d componentes encontrados:\n", k);
-        for(int i=0;i<k;i++){
-            printf("Componente %d (tamanho %d):", i+1, sizes[i]);
-            for(int j=0;j<sizes[i]; j++) printf(" %d", comps[i][j]);
-            printf("\n");
-            free(comps[i]);
+        /* If an output file was provided, write a concise summary (and the full lists) there and avoid printing large dumps to terminal. */
+        if(output){
+            FILE *f = fopen(output, "w"); /* overwrite to keep output focused on this run */
+            if(f){
+                /* compute min/max sizes */
+                int min_sz = (k>0)?sizes[0]:0;
+                int max_sz = (k>0)?sizes[0]:0;
+                for(int i=1;i<k;i++){
+                    if(sizes[i] < min_sz) min_sz = sizes[i];
+                    if(sizes[i] > max_sz) max_sz = sizes[i];
+                }
+                fprintf(f, "# componentes = %d\n", k);
+                fprintf(f, "# maior_componente = %d\n", max_sz);
+                fprintf(f, "# menor_componente = %d\n", min_sz);
+                for(int i=0;i<k;i++){
+                    fprintf(f, "Componente %d (tamanho %d):", i+1, sizes[i]);
+                    for(int j=0;j<sizes[i]; j++) fprintf(f, " %d", comps[i][j]);
+                    fprintf(f, "\n");
+                    free(comps[i]);
+                }
+                fclose(f);
+                /* also print a short confirmation to terminal */
+                printf("%d componentes encontrados. Resumo escrito em '%s'\n", k, output);
+            } else {
+                /* fallback: print only the summary to terminal */
+                printf("%d componentes encontrados (não foi possível escrever em '%s').\n", k, output);
+            }
+        } else {
+            printf("%d componentes encontrados:\n", k);
+            for(int i=0;i<k;i++){
+                printf("Componente %d (tamanho %d):", i+1, sizes[i]);
+                for(int j=0;j<sizes[i]; j++) printf(" %d", comps[i][j]);
+                printf("\n");
+                free(comps[i]);
+            }
         }
         free(comps); free(sizes);
     }
